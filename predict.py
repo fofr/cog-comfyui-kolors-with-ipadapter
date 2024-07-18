@@ -68,12 +68,17 @@ class Predictor(BasePredictor):
         sampler["cfg"] = kwargs["cfg"]
         sampler["steps"] = kwargs["steps"]
 
-        load_image = workflow["95"]["inputs"]
-        load_image["image"] = kwargs["image_filename"]
+        if kwargs["image_filename"]:
+            load_image = workflow["95"]["inputs"]
+            load_image["image"] = kwargs["image_filename"]
 
-        ip_adapter = workflow["96"]["inputs"]
-        ip_adapter["weight_type"] = kwargs["ip_adapter_weight_type"]
-        ip_adapter["weight"] = kwargs["ip_adapter_weight"]
+            ip_adapter = workflow["96"]["inputs"]
+            ip_adapter["weight_type"] = kwargs["ip_adapter_weight_type"]
+            ip_adapter["weight"] = kwargs["ip_adapter_weight"]
+        else:
+            sampler["model"] = ["59", 0]
+            del workflow["93"]
+            del workflow["95"]
 
     def predict(
         self,

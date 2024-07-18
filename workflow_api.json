@@ -38,7 +38,7 @@
   },
   "66": {
     "inputs": {
-      "chatglm3_checkpoint": "chatglm3-fp16.safetensors"
+      "chatglm3_checkpoint": "checkpoints/chatglm3-fp16.safetensors"
     },
     "class_type": "MZ_ChatGLM3Loader",
     "_meta": {
