@@ -36,3 +36,21 @@ SCHEDULERS = [
     "simple",
     "ddim_uniform",
 ]
+
+IPADAPTER_WEIGHT_TYPE = [
+    "style transfer",
+    "strong style transfer",
+    "style transfer precise",
+    "composition",
+    "composition precise",
+    "style and composition",
+    "linear",
+    "ease in",
+    "ease out",
+    "ease in-out",
+    "reverse in-out",
+    "weak input",
+    "weak output",
+    "weak middle",
+    "strong middle",
+]

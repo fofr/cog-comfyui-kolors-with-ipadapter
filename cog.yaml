@@ -26,6 +26,9 @@ build:
     - kornia>=0.7.1
     - websocket-client==1.6.3
 
+    # Faster kolors
+    - cpm-kernels
+
     # layerdiffuse
     - diffusers>=0.25.0
 

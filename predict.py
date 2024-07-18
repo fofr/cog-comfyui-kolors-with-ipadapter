@@ -10,6 +10,7 @@ from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
 from cog_model_helpers import optimise_images
 from cog_model_helpers import seed as seed_helper
+from comfyui_enums import IPADAPTER_WEIGHT_TYPE, SCHEDULERS, SAMPLERS
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -17,8 +18,6 @@ COMFYUI_TEMP_OUTPUT_DIR = "ComfyUI/temp"
 ALL_DIRECTORIES = [OUTPUT_DIR, INPUT_DIR, COMFYUI_TEMP_OUTPUT_DIR]
 
 mimetypes.add_type("image/webp", ".webp")
-
-# Save your example JSON to the same directory as predict.py
 api_json_file = "workflow_api.json"
 
 # Force HF offline
@@ -26,12 +25,12 @@ os.environ["HF_DATASETS_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
+
 class Predictor(BasePredictor):
     def setup(self):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
-        # Give a list of weights filenames to download during setup
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
         self.comfyUI.handle_weights(
@@ -50,19 +49,31 @@ class Predictor(BasePredictor):
     ):
         shutil.copy(input_file, os.path.join(INPUT_DIR, filename))
 
-    # Update nodes in the JSON workflow to modify your workflow based on the given inputs
     def update_workflow(self, workflow, **kwargs):
-        # Below is an example showing how to get the node you need and update the inputs
+        empty_latent_image = workflow["9"]["inputs"]
+        empty_latent_image["width"] = kwargs["width"]
+        empty_latent_image["height"] = kwargs["height"]
+        empty_latent_image["batch_size"] = kwargs["number_of_images"]
 
-        # positive_prompt = workflow["6"]["inputs"]
-        # positive_prompt["text"] = kwargs["prompt"]
+        positive_prompt = workflow["67"]["inputs"]
+        positive_prompt["text"] = kwargs["prompt"]
 
-        # negative_prompt = workflow["7"]["inputs"]
-        # negative_prompt["text"] = f"nsfw, {kwargs['negative_prompt']}"
+        negative_prompt = workflow["62"]["inputs"]
+        negative_prompt["text"] = f"nsfw, {kwargs['negative_prompt']}"
 
-        # sampler = workflow["3"]["inputs"]
-        # sampler["seed"] = kwargs["seed"]
-        pass
+        sampler = workflow["79"]["inputs"]
+        sampler["seed"] = kwargs["seed"]
+        sampler["sampler_name"] = kwargs["sampler"]
+        sampler["scheduler"] = kwargs["scheduler"]
+        sampler["cfg"] = kwargs["cfg"]
+        sampler["steps"] = kwargs["steps"]
+
+        load_image = workflow["95"]["inputs"]
+        load_image["image"] = kwargs["image_filename"]
+
+        ip_adapter = workflow["96"]["inputs"]
+        ip_adapter["weight_type"] = kwargs["ip_adapter_weight_type"]
+        ip_adapter["weight"] = kwargs["ip_adapter_weight"]
 
     def predict(
         self,
@@ -74,8 +85,59 @@ class Predictor(BasePredictor):
             default="",
         ),
         image: Path = Input(
-            description="An input image",
+            description="Image to use as a reference for the IPAdapter",
             default=None,
+        ),
+        number_of_images: int = Input(
+            description="Number of images to generate",
+            default=1,
+            ge=1,
+            le=10,
+        ),
+        width: int = Input(
+            description="Width of the image",
+            default=1024,
+            ge=512,
+            le=2048,
+        ),
+        height: int = Input(
+            description="Height of the image",
+            default=1024,
+            ge=512,
+            le=2048,
+        ),
+        steps: int = Input(
+            description="Number of inference steps",
+            default=25,
+            ge=1,
+            le=50,
+        ),
+        cfg: float = Input(
+            description="Guidance scale",
+            default=4,
+            ge=0,
+            le=20,
+        ),
+        sampler: str = Input(
+            description="Sampler",
+            default="dpmpp_2m_sde_gpu",
+            choices=SAMPLERS,
+        ),
+        scheduler: str = Input(
+            description="Scheduler",
+            default="karras",
+            choices=SCHEDULERS,
+        ),
+        ip_adapter_weight_type: str = Input(
+            description="Weight type for the IPAdapter",
+            default="style transfer precise",
+            choices=IPADAPTER_WEIGHT_TYPE,
+        ),
+        ip_adapter_weight: float = Input(
+            description="Strength of the IPAdapter",
+            default=1.0,
+            ge=0,
+            le=1,
         ),
         output_format: str = optimise_images.predict_output_format(),
         output_quality: int = optimise_images.predict_output_quality(),
@@ -83,8 +145,6 @@ class Predictor(BasePredictor):
     ) -> List[Path]:
         """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
-
-        # Make sure to set the seeds in your workflow
         seed = seed_helper.generate(seed)
 
         image_filename = None
@@ -100,7 +160,16 @@ class Predictor(BasePredictor):
             prompt=prompt,
             negative_prompt=negative_prompt,
             image_filename=image_filename,
+            number_of_images=number_of_images,
+            width=width,
+            height=height,
             seed=seed,
+            steps=steps,
+            cfg=cfg,
+            sampler=sampler,
+            scheduler=scheduler,
+            ip_adapter_weight_type=ip_adapter_weight_type,
+            ip_adapter_weight=ip_adapter_weight,
         )
 
         wf = self.comfyUI.load_workflow(workflow)
